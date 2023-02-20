@@ -1,6 +1,9 @@
 module TestParticleLimit
 
 export timesample, ionize_stepped
+export N0_kinetx, dσ_kinetx, z_R1, z_R2, v_kinetx
+export N⃗_excitation, k_excitation, k_equilibrium
+export Nn_equilibrium, dNn_equilibrium, Nn_excitation, dNn_excitation
 export Ni_equilibrium, dNi_equilibrium, Ni_excitation, dNi_excitation
 export gaussian_sample, moveion, crres_sample
 export propagate_ions, final_ions
@@ -66,12 +69,30 @@ const v_crres = 9.5u"km/s"
 const v0_crres = 1.33u"km/s"
 const vth_crres = 0.296u"km/s"
 const dist_crres = TruncatedNormal(v0_crres, vth_crres*√2, zero(v0_crres))
+const z_R1 = 4.13u"km"
+const z_R2 = 2.81u"km"
 
-Ni_equilibrium(t; N0=N0) = N0 * (1 - exp(-t/τ_equlibrium))
-dNi_equilibrium(t; N0=N0) = N0/τ_equlibrium * exp(-t/τ_equlibrium)
-Ni_excitation(t; N0=N0) = N0 * exp(t*Q)[1,2]
+Nn_equilibrium(t; N0=N0_kinetx) = N0 * exp(-t/τ_equlibrium)
+dNn_equilibrium(t; N0=N0_kinetx) = -N0/τ_equlibrium * exp(-t/τ_equlibrium)
+k_equilibrium(t) = 1/τ_equlibrium
 
-dNi_excitation(t; N0=N0) = N0 * (Q * exp(t*Q))[1,2]
+N⃗_excitation(t; N⃗0=SA[0,N0_kinetx,0,0]) = exp(ustrip.(Unitful.NoUnits, t*Q)) * N⃗0
+function k_excitation(t)
+    N⃗ = N⃗_excitation(t)
+    Nn = @views sum(N⃗[2:end])
+    α = N⃗[2]/Nn
+    β = N⃗[3]/Nn
+    γ = N⃗[4]/Nn
+    k1i*α + k2i*β + kti*γ
+end
+Nn_excitation(t; N0=N0_kinetx) = @views N0 * sum(exp(t*Q)[2:end,2])
+dNn_excitation(t; N0=N0_kinetx) = @views N0 * sum((Q * exp(t*Q))[2:end,2])
+
+Ni_equilibrium(t; N0=N0_kinetx) = N0 * (1 - exp(-t/τ_equlibrium))
+dNi_equilibrium(t; N0=N0_kinetx) = N0/τ_equlibrium * exp(-t/τ_equlibrium)
+
+Ni_excitation(t; N0=N0_kinetx) = N0 * exp(t*Q)[1,2]
+dNi_excitation(t; N0=N0_kinetx) = N0 * (Q * exp(t*Q))[1,2]
 
 function gaussian_sample(t, n; dσ=dσ_kinetx, v=v_kinetx)
     σ = t*dσ
@@ -191,5 +212,6 @@ function searchsortednearest(a, x)
     end
 end
 
+include("analytic.jl")
 
 end # module TestParticleLimit
