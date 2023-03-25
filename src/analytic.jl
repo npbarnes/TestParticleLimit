@@ -1,25 +1,79 @@
 
+using Cubature
 using QuadGK
 using UnPack
 using PhysicalConstants.CODATA2018: m_p
 
-
 export m_Ba
-export P_thermal, nn_payload, 𝓅_payload, ni_observed
+export P3_thermal, P_thermal, nn_payload, 𝓅_payload, ni_observed
 
 const m_Ba = 137m_p
 
-P_thermal(v; dσ=dσ_kinetx)  = 4π*(1/(2π*dσ^2))^(3/2) * v^2 * exp(-(1/2)*(v/dσ)^2)
+struct _Zero end
+_unitless_abstol(::_Zero, u) = 0
+_unitless_abstol(a, u) = ustrip(u, a)
 
+"""
+The Cubatrue package does not support units, so this function is a workaround that strips
+units first, then does the dimensionless integration, and reattaches appropriate units
+before returning the result. This implementation has some limitations:
+1) The integrand f is called once on an arbitrary point inside the integration domain
+in order to determine the units. This may have implications for functions with side effects,
+or computationally expensive functions, or functions that happen to have a sigularity at the
+representative point. Those types of functions most likely would be problematic for cubature
+anyway.
+2) If the unit of the value returned by f(x) depends on the value of x (not just the units of x),
+then ucubature will produce the correct result with units, but it might not be the units you expect.
+The result of f(x) will be converted to unit(f(x_rep)) before being stripped.
+"""
+uhcubature(args...; kwargs...) = _ucubature(hcubature, args...; kwargs...)
+upcubature(args...; kwargs...) = _ucubature(pcubature, args...; kwargs...)
+function _ucubature(cubature::Function, f::Function, xmin, xmax; reltol=1e-8, abstol=_Zero(), maxevals=0)
+    x = (xmin .+ xmax) ./ 2
+    # We implicitly convert to preferred units when we compute the representative point, x.
+    xunits = unit.(x)
+    funit = unit(f(x))
+    Iunit = funit * prod(xunits)
+
+    clean_abstol = _unitless_abstol(abstol, Iunit)
+    clean_f(args) = ustrip(funit, f(args .* xunits))
+    clean_xmin = ustrip.(xmin)
+    clean_xmax = ustrip.(xmax)
+    clean_int, clean_err = cubature(clean_f, clean_xmin, clean_xmax; reltol, abstol=clean_abstol, maxevals)
+    (clean_int*Iunit, clean_err*Iunit)
+end
+
+P3_thermal(v::AbstractArray; dσ=dσ_kinetx) = P3_thermal(norm(v); dσ)
+function P3_thermal(v::Number; dσ=dσ_kinetx)
+    _dσ = uconvert(unit(v), dσ)
+    (1/2π)^(3/2) * _dσ^-3 * exp(-(1/2)*(v/dσ)^2)
+end
+
+function P_thermal(v; dσ=dσ_kinetx)
+    result = 4π * v^2 * P3_thermal(v; dσ)
+
+    # In the limit as v -> inf, P -> 0
+    isinf(v) ? zero(result) : result
+end
+
+export nn_payload
+
+"""
+    nn_payload(t,r; parameters)
+
+Neutral density as a function of time and radius (in the payload frame). Gives the
+correct values when either  t is zero, or r in zero, or both are zero. Undefined when
+either t or r is negative.
+"""
 function nn_payload(t,r; parameters)
-    if r<0u"km"
-        error("Unexpected negative radius")
+    if r == zero(r) && t == zero(t)
+        return Inf*unit(r)^-3
+    elseif t == zero(t)
+        return zero(r^-3)
     end
-    if t ≈ zero(t) || t < zero(t)
-        return 0.0u"km^-3"
-    end
-    @unpack Nn, N0, P, dσ = parameters
-    Nn(t; N0)*P(r/t; dσ)/(4π*r^2*t)
+
+    @unpack Nn, N0, P3, dσ = parameters
+    Nn(t; N0) * t^-3 * P3(r/t; dσ)
 end
 
 """
@@ -31,101 +85,109 @@ function 𝓅_payload(t,r; parameters)
     @unpack k = parameters
     k(t) * nn_payload(t,r; parameters)
 end
-𝓅_payload(t,x,z; parameters) = 𝓅_payload(t, √(x^2 + z^2); parameters)
+𝓅_payload(t,x ,y, z; parameters) = 𝓅_payload(t, √(x^2 + y^2 + z^2); parameters)
 
-function ni_observed(t; parameters)
-    @unpack vD, zR = parameters
-    xi(s) = vD*(t-s)
-    zi(s) = zR*s/t
-    integrand(s) = 𝓅_payload(s, xi(s), zi(s); parameters)
-    result, err = quadgk(integrand, zero(t), t)
-    result
+export 𝓅_ambient
+function 𝓅_ambient(t, x′, y′, z′; parameters)
+    @unpack vD = parameters
+    𝓅_payload(t, x′ - t*vD, y′, z′; parameters)
 end
 
-function f_1d_drift_observed(t, vp′; parameters)
-    @unpack vD, zR = parameters
-    if t ≈ zero(t) || t < zero(t) || vp′ < vD
-        return 0.0u"s * km^-4"
+export density1_ambient
+function density1_ambient(t, x′, y′, z′; parameters)
+    integrand(tᵢ) = tᵢ/t * 𝓅_ambient(tᵢ, x′, y′, z′*tᵢ/t; parameters)
+    quadgk(integrand, zero(t), t)
+end
+
+export density1_payload
+function density1_payload(t, x, y, z; parameters)
+    @unpack vD = parameters
+    density1_ambient(t, x+t*vD, y, z; parameters)
+end
+
+export f_2d_ambient
+function f_2d_ambient(t, x′, y′, z′, vx′, vy′; parameters)
+    ρ = √(x′^2 + y′^2)
+    vp = √(vx′^2 + vy′^2)
+
+    # Handle edge cases:
+    if t<zero(t) || isapprox(t, zero(t); atol=eps(1.0u"s"))
+        return 0.0u"km^-5*s^2"
     end
-    t*vD/vp′^2 * 𝓅_payload(t*vD/vp′, t*vD*(1 - vD/vp′), zR*vD/vp′; parameters)
-end
-
-function f_2d_drift_observed(t, v⃗p′; parameters)
-    vx′, vy′ = v⃗p′
-    vp′ = √(vx′^2 + vy′^2)
-    f_1d_drift_observed(t, vp′)/(2π*vp′)
-
-end
-
-export f_2d
-"""
-Phase space density integrated over all z. The z dependence is a delta function
-"""
-function f_2d(t, v⃗perp; parameters)
-    @unpack vD, zR = parameters
-    vx, vy = v⃗perp
-    vp = √((vx + vD)^2 + vy^2)
-    result = t*vD/(2π*vp^3) * 𝓅_payload(t*vD/vp, t*vD*(1-vD/vp), zR*vD/vp; parameters)
-    vp < vD ? zero(result) : result
-end
-
-export f_E
-function f_E(t, E, θ; parameters)
-    v = √(2E/m_Ba) |> u"km/s"
-    f_2d(t, (-v*cos(θ), v*sin(θ)); parameters)
-end
-
-function differential_intensity(t, v⃗; parameters)
-    @unpack zR = parameters
-    vx, vy = v⃗
-    vp = √(vx^2 + vy^2)
-    vz = zR/t
-    v = √(vx^2 + vy^2 + vz^2)
-
-    f = f_2d(t, v⃗; parameters)
-    I = f*v^2/m_Ba
-
-end
-
-function _F(t; parameters)
-    t_I(t,x; vD) = t - x/vD
-    z_I(t,x; zR, vD) = zR - zR*x/(t*vD)
-    r_I(t,x; zR, vD) = √(x^2 + z_I(t,x; zR, vD)^2)
-    @unpack P, Nn, vD, zR = parameters
-    # Parameterize the ionization manifold as γ(s) = [s, 0, zR - (zR*s)/(t*vD)].
-    # Then J = ||γ'(s)||. F(t) = ∫dni(t_I(s),γ(s)) ||γ'(s)|| ds
-    J = √(1 + (zR/(t*vD))^2)
-    integrand(s) = J * 𝓅_payload(t_I(t,s; vD), r_I(t,s; zR, vD); parameters)
-    result, err = quadgk(integrand, 0u"km", t*vD)
-    result
-end
-
-export _ni
-function _ni(t; parameters)
-    @unpack zR, vD = parameters
-    _F(t; parameters)/√((zR/t)^2 + vD^2)
-end
-
-export production_vs_vp
-function production_vs_vp(t, vp; parameters)
-    @unpack zR, vD = parameters
-    xx = vD*t*(vp - vD)/vp
-    if xx < 0u"km" || xx > vD*t
-        return 0u"km^-3 * s^-1"
+    if vp <= ρ/t
+        return 0.0u"km^-5*s^2"
     end
-    𝓅_payload(t_I(t,xx; vD), r_I(t,xx; zR, vD); parameters)
+
+    ρ / (2π*vp^3) * 𝓅_ambient(ρ/vp, x′, y′, z′*ρ/(vp*t); parameters)
 end
 
-export direct_ion_density
-function direct_ion_density(t; parameters)
-    @unpack vD, zR = parameters
-    # parameterize ionization location in terms of ionization time
-    xi(s) = vD*(t-s)
-    zi(s) = zR*s/t
-    ri(s) = √(xi(s)^2 + zi(s)^2)
-    integrand(s) = 𝓅_payload(s, ri(s); parameters)
-    result, err = quadgk(integrand, zero(t), t)
-    result
+export f_2d_payload
+function f_2d_payload(t, x, y, z, vx, vy; parameters)
+    @unpack vD = parameters
+    f_2d_ambient(t, x + t*vD, y, z, vx + vD, vy; parameters)
+end
+
+export f_2d_payload_cylindrical
+function f_2d_payload_cylindrical(t, x, y, z, vxy, vθ; parameters)
+    #vz = z/t
+    #v = √(vxy^2 + vz^2)
+    vx = vxy*cos(vθ)
+    vy = vxy*sin(vθ)
+    f_2d_payload(t, x, y, z, vx, vy; parameters)
+end
+
+export density2_payload
+function density2_payload(t, x, y, z; parameters)
+    function integrand(args)
+        vx = args[1]
+        vy = args[2]
+
+        #vz = z/t
+        #v = √(vxy^2 + vz^2)
+
+        f_2d_payload(t,x,y,z, vx, vy; parameters)
+    end
+    uhcubature(integrand, [-10, -10]u"km/s", [10,10]u"km/s"; reltol=1e-3)
+end
+
+export density3_payload
+function density3_payload(t, x, y, z; parameters)
+    function integrand(args)
+        vxy = args[1]
+        vθ = args[2]
+        vxy * f_2d_payload_cylindrical(t, x, y, z, vxy, vθ; parameters)
+    end
+    uhcubature(integrand, [0u"km/s", deg2rad(-180)], [10u"km/s", deg2rad(180)]; reltol=1e-3)
+end
+
+using PyPlot: plt
+export plot_dist_xy
+function plot_dist_xy(parameters)
+    fig, ax = plt.subplots()
+    vxs = range(-10u"km/s", 10u"km/s", length=99)
+    vys = range(-10u"km/s", 10u"km/s", length=99)
+
+    @unpack vD = parameters
+    t = 1u"s"
+    Δ = vD*t
+    fs = [f_2d_ambient(1u"s", -Δ, 0u"km", 3u"km", vx, vy; parameters) for vx in vxs, vy in vys]
+
+    ax.pcolormesh(ustrip.(u"km/s", vxs), ustrip.(u"km/s", vys), transpose(ustrip.(u"s^2 * km^-5", fs)))
+    ax.set_aspect("equal")
+    fig, ax
+end
+
+export plot_dist_cylindrical
+function plot_dist_cylindrical(parameters)
+    fig, ax = plt.subplots(subplot_kw=Dict("projection"=>"polar"))
+    vs = range(0u"km/s", 10u"km/s", length=100)
+    vts = range(-π, π, length=99)
+
+    fs = [f_2d_payload_cylindrical(1u"s", 0u"km", 2u"km", 3u"km", v, vt; parameters) for vt in vts, v in vs]
+
+    ax.pcolormesh(vts, ustrip.(u"km/s", vs), transpose(ustrip.(u"s^2 * km^-5", fs)))
+
+    fig, ax
 end
 
 parameters = (
