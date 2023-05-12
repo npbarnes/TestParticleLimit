@@ -1,7 +1,7 @@
 module TestParticleLimit
 
 export timesample, ionize_stepped
-export N0_kinetx, dσ_kinetx, z_R1, z_R2, v_kinetx
+export N0_kinetx, dσ_kinetx, z_R1, z_R2, v_kinetx, vx_kinetx
 export N⃗_excitation, k_excitation, k_equilibrium
 export Nn_equilibrium, dNn_equilibrium, Nn_excitation, dNn_excitation
 export Ni_equilibrium, dNi_equilibrium, Ni_excitation, dNi_excitation
@@ -65,6 +65,7 @@ const N0_kinetx = 2.631e24
 const FWHMrate_kinetx = 3u"km/s"
 const dσ_kinetx = FWHMrate_kinetx/2√(2log(2))
 const v_kinetx = 2.5u"km/s"
+const vx_kinetx = 2.153u"km/s"
 const v_crres = 9.5u"km/s"
 const v0_crres = 1.33u"km/s"
 const vth_crres = 0.296u"km/s"
@@ -94,7 +95,7 @@ dNi_equilibrium(t; N0=N0_kinetx) = N0/τ_equlibrium * exp(-t/τ_equlibrium)
 Ni_excitation(t; N0=N0_kinetx) = N0 * exp(t*Q)[1,2]
 dNi_excitation(t; N0=N0_kinetx) = N0 * (Q * exp(t*Q))[1,2]
 
-function gaussian_sample(t, n; dσ=dσ_kinetx, v=v_kinetx)
+function gaussian_sample(t, n; dσ=dσ_kinetx, v=vx_kinetx)
     σ = t*dσ
     x0 = v*t
     T = SVector{3, promote_type(typeof(σ), typeof(x0))}
