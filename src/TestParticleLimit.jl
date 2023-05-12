@@ -131,8 +131,8 @@ stepcenters(stepedges::AbstractRange) = range(step(stepedges)/2, last(stepedges)
 At each time in times, produce a list of macroparticle ions born in each timestep.
 
 α is the number of macroparicles for N0 microparticles where N0 is the initial number of neutrals.
-I.e. β = α/N0. I.e. α is roughly the total number of particles - `sum(length, ionize_stepped(...))` -
-you will get in the limit of long duration and short timestep.
+I.e. β = α/N0. I.e. α is roughly the total number of particles (i.e. `sum(length, ionize_stepped(...))` )
+in the limit of long duration and short timestep.
 """
 function ionize_stepped(times::AbstractRange, dNi, α, sample_ions)
     dt = step(times)
@@ -165,6 +165,13 @@ function _moveion(ion::AbstractVector, t0, tf)
     result
 end
 
+"""
+    propagate_ions(tfinal, times, ions)
+
+Calculates the positions of the ions at the time `tfinal` in the small gyroradius and test particle limits.
+The `ions` argument should be the ions born at the times in `times`. I.e. ions = ionize_stepped(times, ...).
+See final_ions() for a typical use case.
+"""
 function propagate_ions(tfinal, times::AbstractRange, ions)
     ion_times = stepcenters(times)
     first(ion_times)-step(ion_times)/2 <= tfinal <= last(ion_times)+step(ion_times)/2 || error("tfinal must be within the range of times")
