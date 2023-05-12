@@ -134,10 +134,10 @@ At each time in times, produce a list of macroparticle ions born in each timeste
 I.e. β = α/N0. I.e. α is roughly the total number of particles (i.e. `sum(length, ionize_stepped(...))` )
 in the limit of long duration and short timestep.
 """
-function ionize_stepped(times::AbstractRange, dNi, α, sample_ions)
+function ionize_stepped(times::AbstractRange, dNi, α, sample_ions, N0=N0_kinetx)
     dt = step(times)
     ion_times = stepcenters(times) # dt == step(times) ≈ step(centers) the discretized time of ionization
-    num_new_ions = (round(Int, α/N0*dt*dNi(t)) for t in ion_times)
+    num_new_ions = (round(Int, α/N0*dt*dNi(t; N0)) for t in ion_times)
     [sample_ions(t, n) for (t,n) in zip(ion_times, num_new_ions)]
 end
 
