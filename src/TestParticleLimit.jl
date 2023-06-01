@@ -7,6 +7,7 @@ export Nn_equilibrium, dNn_equilibrium, Nn_excitation, dNn_excitation
 export Ni_equilibrium, dNi_equilibrium, Ni_excitation, dNi_excitation
 export gaussian_sample, moveion, crres_sample
 export propagate_ions, final_ions
+export N_madeup, k_madeup, dNi_madeup
 
 using Unitful
 using StaticArrays
@@ -72,6 +73,44 @@ const vth_crres = 0.296u"km/s"
 const dist_crres = TruncatedNormal(v0_crres, vth_crres*√2, zero(v0_crres))
 const z_R1 = 4.13u"km"
 const z_R2 = 2.81u"km"
+
+# Made up model
+# the parameter α adjusts the excitaiton rate. The long time ionization rate
+# is also affected, but only slightly. I'm not sure how to correct for that.
+function Q_madeup(α)
+    _k1i = k1i
+    _k2i = k2i
+    _kti = kti
+    _k12 = k12*α
+    _k21 = k21*α
+    _kt1 = kt1*α
+    _k1t = k1t*α
+    _k2t = k2t*α
+    _kt2 = kt2*α
+    [ # Transition Matrix (transposed)
+        0u"s^-1"       _k1i            _k2i            _kti;
+        0u"s^-1" -(_k1i+_k12+_k1t)       _k21            _kt1;
+        0u"s^-1"       _k12      -(_k2i+_k21+_k2t)       _kt2;
+        0u"s^-1"       _k1t            _k2t      -(_kti+_kt1+_kt2)
+    ]
+end
+N⃗_madeup(t, α::Number; N0=N0_kinetx) = N⃗_madeup(t, Q_madeup(α); N0)
+function N⃗_madeup(t, Q::AbstractMatrix; N0=N0_kinetx)
+    exp(ustrip.(Unitful.NoUnits, t*Q)) * [0,N0,0,0]
+end
+
+function k_madeup(t, α)
+    N⃗ = N⃗_madeup(t, α)
+    Nn = @views sum(N⃗[2:end])
+    α = N⃗[2]/Nn
+    β = N⃗[3]/Nn
+    γ = N⃗[4]/Nn
+    k1i*α + k2i*β + kti*γ
+end
+dNi_madeup(t, α::Number; N0=N0_kinetx) = dNi_madeup(t, Q_madeup(α); N0)
+function dNi_madeup(t, Q::AbstractMatrix; N0=N0_kinetx)
+    N0 * (Q * exp(t*Q))[1,2]
+end
 
 Nn_equilibrium(t; N0=N0_kinetx) = N0 * exp(-t/τ_equlibrium)
 dNn_equilibrium(t; N0=N0_kinetx) = -N0/τ_equlibrium * exp(-t/τ_equlibrium)
