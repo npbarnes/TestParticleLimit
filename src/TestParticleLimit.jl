@@ -170,8 +170,8 @@ stepcenters(stepedges::AbstractRange) = range(step(stepedges)/2, last(stepedges)
 At each time in times, produce a list of macroparticle ions born in each timestep.
 
 α is the number of macroparicles for N0 microparticles where N0 is the initial number of neutrals.
-I.e. β = α/N0. I.e. α is roughly the total number of particles (i.e. `sum(length, ionize_stepped(...))` )
-in the limit of long duration and short timestep.
+I.e. beta_p = α/N0, I.e. in the limit of long duration and short timestep all the neutrals will ionize
+and the total number of test particles will be about α (`sum(length, ionize_stepped(...)) ≈ α`).
 """
 function ionize_stepped(times::AbstractRange, dNi, α, sample_ions, N0=N0_kinetx)
     dt = step(times)
