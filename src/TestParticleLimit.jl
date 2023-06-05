@@ -77,10 +77,10 @@ const z_R2 = 2.81u"km"
 # Made up model
 # the parameter α adjusts the excitaiton rate. The long time ionization rate
 # is also affected, but only slightly. I'm not sure how to correct for that.
-function Q_madeup(α)
-    _k1i = k1i
-    _k2i = k2i
-    _kti = kti
+function Q_madeup(α=1, β=1)
+    _k1i = k1i*β
+    _k2i = k2i*β
+    _kti = kti*β
     _k12 = k12*α
     _k21 = k21*α
     _kt1 = kt1*α
@@ -94,20 +94,23 @@ function Q_madeup(α)
         0u"s^-1"       _k1t            _k2t      -(_kti+_kt1+_kt2)
     ]
 end
-N⃗_madeup(t, α::Number; N0=N0_kinetx) = N⃗_madeup(t, Q_madeup(α); N0)
-function N⃗_madeup(t, Q::AbstractMatrix; N0=N0_kinetx)
-    exp(ustrip.(Unitful.NoUnits, t*Q)) * [0,N0,0,0]
+
+N⃗_madeup(t, α::Number=1, β::Number=1; N0=N0_kinetx) = N⃗_madeup(t, Q_madeup(α, β); N0)
+function N⃗_madeup(t, QQ::AbstractMatrix; N0=N0_kinetx)
+    exp(ustrip.(Unitful.NoUnits, t*QQ)) * [0,N0,0,0]
 end
 
-function k_madeup(t, α)
-    N⃗ = N⃗_madeup(t, α)
+function k_madeup(t, α=1, β=1)
+    QQ = Q_madeup(α,β)
+    N⃗ = N⃗_madeup(t, QQ)
     Nn = @views sum(N⃗[2:end])
-    α = N⃗[2]/Nn
-    β = N⃗[3]/Nn
-    γ = N⃗[4]/Nn
-    k1i*α + k2i*β + kti*γ
+    a = N⃗[2]/Nn
+    b = N⃗[3]/Nn
+    c = N⃗[4]/Nn
+    QQ[1,2]*a + QQ[1,3]*b + QQ[1,4]*c
 end
-dNi_madeup(t, α::Number; N0=N0_kinetx) = dNi_madeup(t, Q_madeup(α); N0)
+
+dNi_madeup(t, α::Number, β::Number; N0=N0_kinetx) = dNi_madeup(t, Q_madeup(α, β); N0)
 function dNi_madeup(t, Q::AbstractMatrix; N0=N0_kinetx)
     N0 * (Q * exp(t*Q))[1,2]
 end
