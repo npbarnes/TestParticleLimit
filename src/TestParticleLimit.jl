@@ -88,10 +88,10 @@ function Q_madeup(α=1, β=1)
     _k2t = k2t*α
     _kt2 = kt2*α
     [ # Transition Matrix (transposed)
-        0u"s^-1"       _k1i            _k2i            _kti;
-        0u"s^-1" -(_k1i+_k12+_k1t)       _k21            _kt1;
-        0u"s^-1"       _k12      -(_k2i+_k21+_k2t)       _kt2;
-        0u"s^-1"       _k1t            _k2t      -(_kti+_kt1+_kt2)
+        0u"s^-1"        _k1i             _k2i             _kti;
+        0u"s^-1" -(_k1i+_k12+_k1t)       _k21             _kt1;
+        0u"s^-1"        _k12      -(_k2i+_k21+_k2t)       _kt2;
+        0u"s^-1"        _k1t             _k2t      -(_kti+_kt1+_kt2)
     ]
 end
 
