@@ -7,7 +7,7 @@ export Nn_equilibrium, dNn_equilibrium, Nn_excitation, dNn_excitation
 export Ni_equilibrium, dNi_equilibrium, Ni_excitation, dNi_excitation
 export gaussian_sample, moveion, crres_sample
 export propagate_ions, final_ions
-export N_madeup, k_madeup, dNi_madeup
+export N⃗_madeup, k_madeup, dNi_madeup, Q_madeup
 
 using Unitful
 using StaticArrays
