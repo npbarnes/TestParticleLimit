@@ -126,7 +126,7 @@ function k_excitation(t)
     α = N⃗[2]/Nn
     β = N⃗[3]/Nn
     γ = N⃗[4]/Nn
-    k1i*α + k2i*β + kti*γ
+    Q[1,2]*α + Q[1,3]*β + Q[1,4]*γ
 end
 Nn_excitation(t; N0=N0_kinetx) = @views N0 * sum(exp(t*Q)[2:end,2])
 dNn_excitation(t; N0=N0_kinetx) = @views N0 * sum((Q * exp(t*Q))[2:end,2])
