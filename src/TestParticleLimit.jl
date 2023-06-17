@@ -9,14 +9,16 @@ export gaussian_sample, moveion, crres_sample
 export propagate_ions, final_ions
 export N⃗_madeup, k_madeup, dNi_madeup, Q_madeup
 
+export bimodal_sample
+
 using Unitful
 using StaticArrays
 using LinearAlgebra
+using Distributions
 
 include("TruncatedNormals.jl")
 
-using .TruncatedNormals
-export TruncatedNormal
+import .TruncatedNormals
 
 """
     timesample(τ)
@@ -70,7 +72,7 @@ const vx_kinetx = 2.153u"km/s"
 const v_crres = 9.5u"km/s"
 const v0_crres = 1.33u"km/s"
 const vth_crres = 0.296u"km/s"
-const dist_crres = TruncatedNormal(v0_crres, vth_crres*√2, zero(v0_crres))
+const dist_crres = TruncatedNormals.TruncatedNormal(v0_crres, vth_crres*√2, zero(v0_crres))
 const z_R1 = 4.13u"km"
 const z_R2 = 2.81u"km"
 
@@ -137,6 +139,7 @@ dNi_equilibrium(t; N0=N0_kinetx) = N0/τ_equlibrium * exp(-t/τ_equlibrium)
 Ni_excitation(t; N0=N0_kinetx) = N0 * exp(t*Q)[1,2]
 dNi_excitation(t; N0=N0_kinetx) = N0 * (Q * exp(t*Q))[1,2]
 
+"""Sample n points from a gaussian"""
 function gaussian_sample(t, n; dσ=dσ_kinetx, v=vx_kinetx)
     σ = t*dσ
     x0 = v*t
@@ -148,12 +151,35 @@ function gaussian_sample(t, n; dσ=dσ_kinetx, v=vx_kinetx)
     result
 end
 
+function bimodal_sample(t, n; ratio=0.55, v1=0.63u"km/s", v2=4u"km/s", dσ1=dσ_kinetx, dσ2=dσ_kinetx)
+    σ1 = t*dσ1
+    σ2 = t*dσ2
+    x1 = v1*t
+    x2 = v2*t
+
+    T = promote_type(typeof(σ1), typeof(σ2), typeof(x1), typeof(x2))
+    VT = SVector{3, T}
+
+    result = Vector{VT}(undef, n)
+    for i in eachindex(result)
+        if rand(Bernoulli(ratio))
+            σ = σ1
+            x = x1
+        else
+            σ = σ2
+            x = x2
+        end
+        result[i] = VT(σ*randn() + x, σ*randn(), σ*randn())
+    end
+    result
+end
+
 function sphere_sample()
     normalize(SA[randn(), randn(), randn()])
 end
 
 function crres_sample(t, n; v=v_crres, v0=v0_crres, vth=vth_crres)
-    dist = TruncatedNormal(v0, vth*√2, zero(v0))
+    dist = TruncatedNormals.TruncatedNormal(v0, vth*√2, zero(v0))
     x0 = v*t
     T = SVector{3, promote_type(eltype(dist), typeof(x0))}
     result = Vector{T}(undef, n)
