@@ -151,7 +151,7 @@ function gaussian_sample(t, n; dσ=dσ_kinetx, v=vx_kinetx)
     result
 end
 
-function bimodal_sample(t, n; ratio=0.55, v1=0.63u"km/s", v2=4u"km/s", dσ1=dσ_kinetx, dσ2=dσ_kinetx)
+function bimodal_sample(t, n; r=0.55, v1=0.63u"km/s", v2=4u"km/s", dσ1=dσ_kinetx, dσ2=dσ_kinetx)
     σ1 = t*dσ1
     σ2 = t*dσ2
     x1 = v1*t
@@ -162,7 +162,7 @@ function bimodal_sample(t, n; ratio=0.55, v1=0.63u"km/s", v2=4u"km/s", dσ1=dσ_
 
     result = Vector{VT}(undef, n)
     for i in eachindex(result)
-        if rand(Bernoulli(ratio))
+        if rand(Bernoulli(r))
             σ = σ1
             x = x1
         else
