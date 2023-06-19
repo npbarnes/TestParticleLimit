@@ -188,8 +188,6 @@ function multimodal_sample(t, n; weights, vs, dσs=fill(dσ_kinetx, length(vs)))
     σs = t .* dσs
     xs = t .* vs
 
-    @show v = sum(ws .* vs)
-
     T = promote_type(eltype(σs), eltype(xs))
     VT = SVector{3, T}
 
