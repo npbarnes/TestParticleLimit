@@ -183,7 +183,7 @@ function balancedbimodal_sample(t, n; r, Δv, v=vx_kinetx, dσ=dσ_kinetx)
     bimodal_sample(t,n; r, v1, v2, dσ1=dσ, dσ2=dσ)
 end
 
-function multimodal_sample(t, n; weights, vs, dσs)
+function multimodal_sample(t, n; weights, vs, dσs=fill(dσ_kinetx, length(vs)))
     ws = normalize(weights)
     σs = t .* dσs
     xs = t .* vs
