@@ -9,7 +9,7 @@ export gaussian_sample, moveion, crres_sample
 export propagate_ions, final_ions
 export N⃗_madeup, k_madeup, dNi_madeup, Q_madeup
 
-export bimodal_sample
+export bimodal_sample, balancedbimodal_sample, multimodal_sample
 
 using Unitful
 using StaticArrays
@@ -169,6 +169,36 @@ function bimodal_sample(t, n; r=0.55, v1=0.63u"km/s", v2=4u"km/s", dσ1=dσ_kine
             σ = σ2
             x = x2
         end
+        result[i] = VT(σ*randn() + x, σ*randn(), σ*randn())
+    end
+    result
+end
+
+"""
+Functionally similar to bimodal_sample(), but this version guarantees conservation of momentum and uniform expansion.
+"""
+function balancedbimodal_sample(t, n; r, Δv, v=vx_kinetx, dσ=dσ_kinetx)
+    v1 = v - (1-r)*Δv
+    v2 = v1 + Δv
+    bimodal_sample(t,n; r, v1, v2, dσ1=dσ, dσ2=dσ)
+end
+
+function multimodal_sample(t, n; weights, vs, dσs)
+    ws = normalize(weights)
+    σs = t .* dσs
+    xs = t .* vs
+
+    @show v = sum(ws .* vs)
+
+    T = promote_type(eltype(σs), eltype(xs))
+    VT = SVector{3, T}
+
+    result = Vector{VT}(undef, n)
+    S = Categorical(ws)
+    for i in eachindex(result)
+        j = rand(S)
+        σ = σs[j]
+        x = xs[j]
         result[i] = VT(σ*randn() + x, σ*randn(), σ*randn())
     end
     result
