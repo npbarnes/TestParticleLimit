@@ -160,7 +160,7 @@ function density3_payload(t, x, y, z; parameters)
     uhcubature(integrand, [0u"km/s", deg2rad(-180)], [10u"km/s", deg2rad(180)]; reltol=1e-3)
 end
 
-using PyPlot: plt
+#= using PyPlot: plt
 export plot_dist_xy
 function plot_dist_xy(parameters)
     fig, ax = plt.subplots()
@@ -188,7 +188,7 @@ function plot_dist_cylindrical(parameters)
     ax.pcolormesh(vts, ustrip.(u"km/s", vs), transpose(ustrip.(u"s^2 * km^-5", fs)))
 
     fig, ax
-end
+end =#
 
 parameters = (
     # Base parameters (values)
